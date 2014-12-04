@@ -1,10 +1,14 @@
 #include <assert.h>
 #include <string.h>
 
+#include <stdlib.h>
+
 #include "tsp-types.h"
 #include "tsp-genmap.h"
 #include "tsp-print.h"
 #include "tsp-tsp.h"
+
+void* ALL_IS_OK = (void*)123456789L;
 
 /* dernier minimum trouvé */
 int minimum;
@@ -23,11 +27,23 @@ int present (int city, int hops, tsp_path_t path)
 
 
 
-void tsp (int hops, int len, tsp_path_t path, long long int *cuts, tsp_path_t sol, int *sol_len)
+// void tsp (int hops, int len, tsp_path_t path, long long int *cuts, tsp_path_t sol, int *sol_len)
+void* tsp (void* arguments)
 {
+    struct arg_struct *args = (struct arg_struct*) arguments;
+
+    int hops = args->hops;
+    int len = args->len;
+    tsp_path_t path;
+    memcpy(path, args->path, MAX_TOWNS * sizeof (int));
+    long long int *cuts = args->cuts;
+    tsp_path_t sol;
+    memcpy(sol, args->sol, MAX_TOWNS * sizeof (int));
+    int *sol_len = args->sol_len;
+
   if (len + cutprefix[(nb_towns-hops)] >= minimum) {
       (*cuts)++ ;
-      return;
+      return ALL_IS_OK;
     }
     
     if (hops == nb_towns) {
@@ -45,9 +61,63 @@ void tsp (int hops, int len, tsp_path_t path, long long int *cuts, tsp_path_t so
             if (!present (i, hops, path)) {
                 path[hops] = i;
                 int dist = distance[me][i];
-                tsp (hops + 1, len + dist, path, cuts, sol, sol_len);
+
+                args->hops = hops + 1;
+                args->len = len + dist;
+                memcpy(args->path, path, MAX_TOWNS * sizeof (int));
+                memcpy(args->sol, sol, MAX_TOWNS * sizeof (int));
+                tsp ((void*)args);
             }
         }
     }
+    pthread_exit(NULL);
+    return ALL_IS_OK;
+}
+
+
+
+Liste Creer_Liste(void){
+    return NULL;
+}
+
+Liste Ajouter(Liste l, int Taille_Max){
+    Cell* cellule = malloc(sizeof(Cell));
+    Liste l_temp = l;
+    int i = 1;
+
+    if (l == NULL){
+        cellule->suiv = NULL;
+        return cellule;
+    }
+
+    while (l_temp->suiv != NULL && i < Taille_Max){
+        l_temp = l_temp->suiv;
+        i++;
+    }
+    if (i < Taille_Max){
+        cellule->suiv = NULL;
+        l_temp->suiv = cellule;
+        return l;
+    }
+    else return NULL;
+    
+}
+
+Liste Supprimer(Liste l, int indice){
+    Liste temp = l;
+    if (indice == 0){
+        free(l);
+        return temp->suiv;
+    }
+
+    l->suiv = Supprimer(l->suiv, indice -1);
+    return l;
+}
+
+pthread_t Dernier(Liste l){ /* Quand on appelle cette fonction, la liste n'est pas vide */
+    while (l->suiv != NULL){
+        l = l->suiv;
+    }
+    return l->thread;
 }
 

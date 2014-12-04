@@ -15,6 +15,12 @@
 #include "tsp-print.h"
 #include "tsp-tsp.h"
 
+#include <pthread.h>
+
+pthread_cond_t condition = PTHREAD_COND_INITIALIZER; /* Création de la condition */
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER; /* Création du mutex */
+
+extern void* ALL_IS_OK;
 
 /* macro de mesure de temps, retourne une valeur en nanosecondes */
 #define TIME_DIFF(t1, t2) \
@@ -74,6 +80,11 @@ int main (int argc, char **argv)
     struct tsp_queue q;
     struct timespec t1, t2;
 
+    /***********************/
+    struct arg_struct arguments;
+    /***********************/
+
+
     /* lire les arguments */
     int opt;
     while ((opt = getopt(argc, argv, "s")) != -1) {
@@ -95,18 +106,23 @@ int main (int argc, char **argv)
     nb_threads = atoi(argv[optind+2]);
     assert(nb_towns > 0);
     assert(nb_threads > 0);
+    /**/
    
     minimum = INT_MAX;
       
+
     /* generer la carte et la matrice de distance */
     fprintf (stderr, "ncities = %3d\n", nb_towns);
     genmap ();
+    /**/
+
 
     init_queue (&q);
 
-    clock_gettime (CLOCK_REALTIME, &t1);
+    clock_gettime (CLOCK_REALTIME, &t1); /* Déclenche le chrono */
 
-    memset (path, -1, MAX_TOWNS * sizeof (int));
+    memset (path, -1, MAX_TOWNS * sizeof (int)); /* Met -1 dans les "MAX_TOWNS*sizeof(int)" premiers bits
+        de la zone mémoire pointée par path */
     path[0] = 0;
 
     /* mettre les travaux dans la file d'attente */
@@ -117,10 +133,49 @@ int main (int argc, char **argv)
     tsp_path_t solution;
     memset (solution, -1, MAX_TOWNS * sizeof (int));
     solution[0] = 0;
+
+
+
+    Liste liste_threads = Creer_Liste();
+    Liste temp;
+    void* status;
+    int find_thread = 0;
+    int i;
+    pthread_t thread;
     while (!empty_queue (&q)) {
         int hops = 0, len = 0;
         get_job (&q, solution, &hops, &len);
-        tsp (hops, len, solution, &cuts, sol, &sol_len);
+
+        /******************************/
+        i = 0;
+        temp = liste_threads;
+        while(temp != NULL){ /* On supprime de la liste les threads qui sont terminés */
+            pthread_join (temp->thread, &status);
+            if (status == ALL_IS_OK){
+                Supprimer(temp, i);
+            }
+            i++;
+            temp = temp->suiv;
+        }
+
+        arguments.hops = hops;
+        arguments.len = len;
+        memcpy(arguments.path, solution, MAX_TOWNS * sizeof (int));
+        arguments.cuts = &cuts;
+        memcpy(arguments.sol, sol, MAX_TOWNS * sizeof (int));
+        arguments.sol_len = &sol_len;
+
+        while(!find_thread){ /* Tant qu'on n'a pas trouvé de thread dispo .. */            
+            temp = Ajouter(liste_threads, nb_threads);
+            if (temp != NULL){
+                liste_threads = temp;
+                thread = Dernier(liste_threads);
+                pthread_create (&thread, NULL, tsp, (void*)&arguments);
+                find_thread = 1;
+            }
+        }
+
+        /*******************************/
     }
     
     clock_gettime (CLOCK_REALTIME, &t2);
