@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <string.h>
-
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "tsp-types.h"
 #include "tsp-genmap.h"
@@ -10,8 +10,12 @@
 
 void* ALL_IS_OK = (void*)123456789L;
 
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER; /* Création du mutex */
+
 /* dernier minimum trouvé */
 int minimum;
+
+extern Cell* tab_threads;
 
 /* résolution du problème du voyageur de commerce */
 int present (int city, int hops, tsp_path_t path)
@@ -25,11 +29,21 @@ int present (int city, int hops, tsp_path_t path)
     return 0 ;
 }
 
-
-
-// void tsp (int hops, int len, tsp_path_t path, long long int *cuts, tsp_path_t sol, int *sol_len)
+/**
+ * [tsp  description]
+ * @param hops    nombre de ville dans le chemin path
+ * @param len     longueur du chemin path
+ * @param path    chemin
+ * @param cuts    ??
+ * @param sol     Solution résultant 
+ * @param sol_len [description]
+ */
 void* tsp (void* arguments)
 {
+    //printf("    ENTREE TSP avec %lx\n", pthread_self());
+
+    /*********** On ressort les variables de la arg_struct ****************************************/
+
     struct arg_struct *args = (struct arg_struct*) arguments;
 
     int hops = args->hops;
@@ -41,83 +55,71 @@ void* tsp (void* arguments)
     memcpy(sol, args->sol, MAX_TOWNS * sizeof (int));
     int *sol_len = args->sol_len;
 
-  if (len + cutprefix[(nb_towns-hops)] >= minimum) {
-      (*cuts)++ ;
-      return ALL_IS_OK;
+    int N_thread = args->N_thread;
+
+    /**********************************************************************************************/
+
+    pthread_mutex_lock (&mutex); /* On verrouille le mutex */
+    if (len + cutprefix[(nb_towns-hops)] >= minimum) { /* Si sa longueur du chemin + .... */
+        (*cuts)++ ;
+        //printf("EXIT TSP avec %lx\n", pthread_self());
+        
+        tab_threads[N_thread].occupe = 0;
+        pthread_mutex_unlock (&mutex); /* On déverrouille le mutex */
+        return (void*)NULL;
     }
-    
-    if (hops == nb_towns) {
+
+    if (hops == nb_towns) { /* Si on a un chemin complet (ie qui contient toutes les villes) */
 	    int me = path [hops - 1];
 	    int dist = distance[me][0]; // retourner en 0
-            if ( len + dist < minimum ) {
+
+        //pthread_mutex_lock (&mutex); /* On verrouille le mutex */
+        if ( len + dist < minimum ) { /* Si ce chemin représente un plus court chemin temporaire alors on stocke sa 
+                valeure dans solution et on l'écrit */
 		    minimum = len + dist;
 		    *sol_len = len + dist;
 		    memcpy(sol, path, nb_towns*sizeof(int));
+            //pthread_mutex_unlock (&mutex); /* On déverrouille le mutex */
+
 		    print_solution (path, len+dist);
 	    }
-    } else {
-        int me = path [hops - 1];        
-        for (int i = 0; i < nb_towns; i++) {
-            if (!present (i, hops, path)) {
+
+    }
+
+    else { /* Si on n'a pas un chemin complet (ie qui ne contient pas toutes les villes) */
+        int me = path [hops - 1]; /* On stocke la dernière ville du chemin dans la variable "me" */      
+
+        //pthread_mutex_lock (&mutex); /* On verrouille le mutex */
+        for (int i = 0; i < nb_towns; i++) { /* On regarde toutes les villes */
+      
+            if (!present (i, hops, path)) { /* On rajoute les villes qui ne sont pas présentes dans le chemin path */
                 path[hops] = i;
                 int dist = distance[me][i];
 
+                /********************************************/
+
                 args->hops = hops + 1;
                 args->len = len + dist;
-                memcpy(args->path, path, MAX_TOWNS * sizeof (int));
+
+                memcpy(args->path, path, (hops+1) * sizeof (int));
                 memcpy(args->sol, sol, MAX_TOWNS * sizeof (int));
-                tsp ((void*)args);
+                pthread_mutex_unlock (&mutex); /* On déverrouille le mutex */
+
+                return tsp ((void*)args);
+
+                /********************************************/
             }
         }
     }
-    pthread_exit(NULL);
-    return ALL_IS_OK;
-}
 
-
-
-Liste Creer_Liste(void){
-    return NULL;
-}
-
-Liste Ajouter(Liste l, int Taille_Max){
-    Cell* cellule = malloc(sizeof(Cell));
-    Liste l_temp = l;
-    int i = 1;
-
-    if (l == NULL){
-        cellule->suiv = NULL;
-        return cellule;
-    }
-
-    while (l_temp->suiv != NULL && i < Taille_Max){
-        l_temp = l_temp->suiv;
-        i++;
-    }
-    if (i < Taille_Max){
-        cellule->suiv = NULL;
-        l_temp->suiv = cellule;
-        return l;
-    }
-    else return NULL;
+    //printf("    EXIT TSP avec %lx\n", pthread_self());
+   
+    /************************************/
+    tab_threads[N_thread].occupe = 0;
+    pthread_mutex_unlock (&mutex); /* On déverrouille le mutex */
+    return (void*)NULL;;
     
+    /************************************/
 }
 
-Liste Supprimer(Liste l, int indice){
-    Liste temp = l;
-    if (indice == 0){
-        free(l);
-        return temp->suiv;
-    }
-
-    l->suiv = Supprimer(l->suiv, indice -1);
-    return l;
-}
-
-pthread_t Dernier(Liste l){ /* Quand on appelle cette fonction, la liste n'est pas vide */
-    while (l->suiv != NULL){
-        l = l->suiv;
-    }
-    return l->thread;
-}
-
+/****************************************************************************/

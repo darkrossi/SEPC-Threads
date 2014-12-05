@@ -15,12 +15,21 @@
 #include "tsp-print.h"
 #include "tsp-tsp.h"
 
+
+
+/*****************************/
+
 #include <pthread.h>
 
-pthread_cond_t condition = PTHREAD_COND_INITIALIZER; /* Création de la condition */
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER; /* Création du mutex */
-
 extern void* ALL_IS_OK;
+
+extern void* tsp (void* arguments);
+
+Cell* tab_threads;
+
+/*****************************/
+
+
 
 /* macro de mesure de temps, retourne une valeur en nanosecondes */
 #define TIME_DIFF(t1, t2) \
@@ -42,23 +51,39 @@ int nb_threads=1;
 /* affichage SVG */
 bool affiche_sol= false;
 
-
+/**
+ * [generate_tsp_jobs  description]
+ * @param q       Queue de jobs
+ * @param hops    Nombre de villes dans path
+ * @param len     Longueur de path
+ * @param path    Chemin
+ * @param cuts    ??
+ * @param sol     Solution
+ * @param sol_len Longueur de solution
+ * @param depth   Profondeur
+ */
+/* Initialement : &q, 1, 0, path, &cuts, sol, & sol_len, 3 */ 
 static void generate_tsp_jobs (struct tsp_queue *q, int hops, int len, tsp_path_t path, long long int *cuts, tsp_path_t sol, int *sol_len, int depth)
 {
-    if (len >= minimum) {
-        (*cuts)++ ;
+    if (len >= minimum) { /* Si la longueur du chemin est plus grande que le minimum global */
+        (*cuts)++ ; /* On incrémente cuts */
         return;
     }
     
-    if (hops == depth) {
+    if (hops == depth) { /* Si le nombre de ville dans path est égal à la profondeur depth */
+
         /* On enregistre du travail à faire plus tard... */
         add_job (q, path, hops, len);
-    } else {
-        int me = path [hops - 1];        
-        for (int i = 0; i < nb_towns; i++) {
-            if (!present (i, hops, path)) {
-                path[hops] = i;
-                int dist = distance[me][i];
+    }
+
+    else {/* Si le nombre de ville dans path est différent à la profondeur depth */
+        int me = path [hops - 1]; /*On stocke la dernière ville du chemin dans me */
+
+        for (int i = 0; i < nb_towns; i++) { /* On parcourt toutes les villes */
+            if (!present (i, hops, path)) { /* Si la ville i n'est pas présente dans path */
+                path[hops] = i; /* On rajoute la ville i à path*/
+                int dist = distance[me][i]; /* On note la distance entre l'ex dernière ville de path avec la new dernière ville
+                    de path */
                 generate_tsp_jobs (q, hops + 1, len + dist, path, cuts, sol, sol_len, depth);
             }
         }
@@ -73,9 +98,12 @@ static void usage(const char *name) {
 int main (int argc, char **argv)
 {
     unsigned long long perf;
-    tsp_path_t path;
-    tsp_path_t sol;
-    int sol_len;
+
+    tsp_path_t path; /* Correspond au chemin parcouru */
+    tsp_path_t sol; /* Correspond à la solution */
+
+    int sol_len; /* Longueur du chemin sol */
+
     long long int cuts = 0;
     struct tsp_queue q;
     struct timespec t1, t2;
@@ -108,74 +136,94 @@ int main (int argc, char **argv)
     assert(nb_threads > 0);
     /**/
    
-    minimum = INT_MAX;
+    minimum = INT_MAX; /* On initialise la variable global minimum */
       
-
     /* generer la carte et la matrice de distance */
     fprintf (stderr, "ncities = %3d\n", nb_towns);
     genmap ();
     /**/
 
-
-    init_queue (&q);
+    init_queue (&q); /* Initialise la liste des jobs à faire */
 
     clock_gettime (CLOCK_REALTIME, &t1); /* Déclenche le chrono */
 
-    memset (path, -1, MAX_TOWNS * sizeof (int)); /* Met -1 dans les "MAX_TOWNS*sizeof(int)" premiers bits
-        de la zone mémoire pointée par path */
+    memset (path, -1, MAX_TOWNS * sizeof (int)); /* Met que des -1 dans le tableau d'entiers path */
     path[0] = 0;
 
-    /* mettre les travaux dans la file d'attente */
-    generate_tsp_jobs (&q, 1, 0, path, &cuts, sol, & sol_len, 3);
-    no_more_jobs (&q);
+    generate_tsp_jobs (&q, 1, 0, path, &cuts, sol, & sol_len, 3); /* Génére toutes les tâches à effectuer */
+    no_more_jobs (&q); /* Dit qu'il n'y aura plus de jobs à ajouter à la liste */
    
-    /* calculer chacun des travaux */
     tsp_path_t solution;
-    memset (solution, -1, MAX_TOWNS * sizeof (int));
-    solution[0] = 0;
+    memset (solution, -1, MAX_TOWNS * sizeof (int)); /* Met que des -1 dans le tableau d'entiers solution */
 
 
 
-    Liste liste_threads = Creer_Liste();
-    Liste temp;
-    void* status;
-    int find_thread = 0;
-    int i;
-    pthread_t thread;
+     /**********   ADD   **************/
+
+    tab_threads = malloc(nb_threads*sizeof(Cell));
+    int i, j = 0;
+    
+    for(i = 0; i< nb_threads; i++){
+        tab_threads[i].occupe = 0;
+    }
+
+     /******************************/
+
+
+
     while (!empty_queue (&q)) {
-        int hops = 0, len = 0;
-        get_job (&q, solution, &hops, &len);
+        j++;
+        //printf("ENTREE WHILE1 MAIN avec %lx\n", pthread_self());
 
-        /******************************/
-        i = 0;
-        temp = liste_threads;
-        while(temp != NULL){ /* On supprime de la liste les threads qui sont terminés */
-            pthread_join (temp->thread, &status);
-            if (status == ALL_IS_OK){
-                Supprimer(temp, i);
-            }
-            i++;
-            temp = temp->suiv;
-        }
+        int hops = 0; /* Nb de villes parcourus par un chemin donné (hop = saut..) */
+        int len = 0; /* Longueur d'un chemin donné */
+
+        get_job (&q, solution, &hops, &len); /* Sort un job de la queue et le met dans solution */
+        
+
+        /****************************************************/
 
         arguments.hops = hops;
         arguments.len = len;
-        memcpy(arguments.path, solution, MAX_TOWNS * sizeof (int));
+        memcpy(arguments.path, solution, hops * sizeof (int));
         arguments.cuts = &cuts;
         memcpy(arguments.sol, sol, MAX_TOWNS * sizeof (int));
         arguments.sol_len = &sol_len;
 
-        while(!find_thread){ /* Tant qu'on n'a pas trouvé de thread dispo .. */            
-            temp = Ajouter(liste_threads, nb_threads);
-            if (temp != NULL){
-                liste_threads = temp;
-                thread = Dernier(liste_threads);
-                pthread_create (&thread, NULL, tsp, (void*)&arguments);
-                find_thread = 1;
+        //printf("ENTREE SEARCH THREAD DISPO MAIN avec %lx\n", pthread_self());
+
+        for(i=0; i<nb_threads; i++){
+            if(!tab_threads[i].occupe){
+                arguments.N_thread = i;
+                tab_threads[i].occupe = 1;
+                pthread_create (&tab_threads[i].thread, NULL, tsp, (void*)&arguments);
+                break;
             }
         }
 
+        if (i == nb_threads){
+            printf("\n Pas de thread dispo\n");
+            add_job (&q, solution, hops, len) ;
+        }
+
+       // printf("EXIT SEARCH THREAD DISPO MAIN avec %lx\n", pthread_self());
+
+        /** Parcours de la liste des threads **/
+        /*int temp_parcours = 0;
+        printf("\n    # Parcours de la liste #\n");
+        for(i=0; i<nb_threads; i++) {
+            if(tab_threads[i].occupe) temp_parcours += 1;
+        }
+        printf("    Actuellement, il y a %d threads dans la liste\n\n", temp_parcours);
+        printf("%d\n",j);*/
         /*******************************/
+
+        //printf("EXIT WHILE MAIN avec %lx\n", pthread_self());
+
+    }
+
+    for(i=0; i<nb_threads; i++){
+        pthread_join(tab_threads[i].thread, NULL);
     }
     
     clock_gettime (CLOCK_REALTIME, &t2);

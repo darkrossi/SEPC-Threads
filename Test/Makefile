@@ -8,7 +8,6 @@ main: main.c
 
 allocateur: allocateur.c
 	$(CC) -o allocateur allocateur.c -lpthread
-	./allocateur
 
 mutex: mutex.c
 	$(CC) -o mutex mutex.c -lpthread
