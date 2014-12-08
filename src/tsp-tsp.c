@@ -10,12 +10,16 @@
 
 void* ALL_IS_OK = (void*)123456789L;
 
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER; /* Création du mutex */
+pthread_mutex_t mutex;
 
 /* dernier minimum trouvé */
 int minimum;
 
 extern Cell* tab_threads;
+extern tsp_path_t sol; /* Correspond à la solution */
+extern int sol_len; /* Longueur du chemin sol */
+extern int nb_threads;
+extern long long int cuts;
 
 /* résolution du problème du voyageur de commerce */
 int present (int city, int hops, tsp_path_t path)
@@ -42,70 +46,62 @@ void* tsp (void* arguments)
 {
     //printf("    ENTREE TSP avec %lx\n", pthread_self());
 
-    /*********** On ressort les variables de la arg_struct ****************************************/
+    
+    //printf("Le thread %lx prend le mutex\n", pthread_self());
 
-    struct arg_struct *args = (struct arg_struct*) arguments;
-
-    int hops = args->hops;
-    int len = args->len;
-    tsp_path_t path;
-    memcpy(path, args->path, MAX_TOWNS * sizeof (int));
-    long long int *cuts = args->cuts;
-    tsp_path_t sol;
-    memcpy(sol, args->sol, MAX_TOWNS * sizeof (int));
-    int *sol_len = args->sol_len;
-
-    int N_thread = args->N_thread;
-
-    /**********************************************************************************************/
-
-    pthread_mutex_lock (&mutex); /* On verrouille le mutex */
-    if (len + cutprefix[(nb_towns-hops)] >= minimum) { /* Si sa longueur du chemin + .... */
-        (*cuts)++ ;
+    if (tab_threads[getTID()].arguments.len + cutprefix[(nb_towns-tab_threads[getTID()].arguments.hops)] >= minimum) { /* Si sa longueur du chemin + .... */
+        pthread_mutex_lock (&mutex); /* On verrouille le mutex */
+        (cuts)++ ;
         //printf("EXIT TSP avec %lx\n", pthread_self());
         
-        tab_threads[N_thread].occupe = 0;
+        tab_threads[getTID()].occupe = 0;
+        //printf("Le thread %lx rend le mutex\n", pthread_self());
         pthread_mutex_unlock (&mutex); /* On déverrouille le mutex */
-        return (void*)NULL;
+        return ALL_IS_OK;
     }
 
-    if (hops == nb_towns) { /* Si on a un chemin complet (ie qui contient toutes les villes) */
-	    int me = path [hops - 1];
-	    int dist = distance[me][0]; // retourner en 0
+    //printf("Le thread %lx rend le mutex\n", pthread_self());
+    //pthread_mutex_unlock (&mutex); /* On déverrouille le mutex */
+    if (tab_threads[getTID()].arguments.hops == nb_towns) { /* Si on a un chemin complet (ie qui contient toutes les villes) */
+	    tab_threads[getTID()].arguments.me = tab_threads[getTID()].arguments.path [tab_threads[getTID()].arguments.hops - 1];
+	    tab_threads[getTID()].arguments.dist = distance[tab_threads[getTID()].arguments.me][0]; // retourner en 0
 
         //pthread_mutex_lock (&mutex); /* On verrouille le mutex */
-        if ( len + dist < minimum ) { /* Si ce chemin représente un plus court chemin temporaire alors on stocke sa 
+        //printf("Le thread %lx prend le mutex\n", pthread_self());
+        
+        pthread_mutex_lock (&mutex); /* On verrouille le mutex */
+        if ( tab_threads[getTID()].arguments.len + tab_threads[getTID()].arguments.dist < minimum ) { /* Si ce chemin représente un plus court chemin temporaire alors on stocke sa 
                 valeure dans solution et on l'écrit */
-		    minimum = len + dist;
-		    *sol_len = len + dist;
-		    memcpy(sol, path, nb_towns*sizeof(int));
-            //pthread_mutex_unlock (&mutex); /* On déverrouille le mutex */
 
-		    print_solution (path, len+dist);
+		    minimum = tab_threads[getTID()].arguments.len + tab_threads[getTID()].arguments.dist;
+		    sol_len = tab_threads[getTID()].arguments.len + tab_threads[getTID()].arguments.dist;
+
+		    memcpy(sol, tab_threads[getTID()].arguments.path, nb_towns*sizeof(int));
+
+		    print_solution (tab_threads[getTID()].arguments.path, tab_threads[getTID()].arguments.len+tab_threads[getTID()].arguments.dist);
 	    }
+        pthread_mutex_unlock (&mutex); /* On déverrouille le mutex */
 
+        //pthread_mutex_unlock (&mutex);
+        //printf("Le thread %lx rend le mutex\n", pthread_self());
+        
     }
 
     else { /* Si on n'a pas un chemin complet (ie qui ne contient pas toutes les villes) */
-        int me = path [hops - 1]; /* On stocke la dernière ville du chemin dans la variable "me" */      
+        tab_threads[getTID()].arguments.me = tab_threads[getTID()].arguments.path [tab_threads[getTID()].arguments.hops - 1]; /* On stocke la dernière ville du chemin dans la variable "me" */      
 
-        //pthread_mutex_lock (&mutex); /* On verrouille le mutex */
-        for (int i = 0; i < nb_towns; i++) { /* On regarde toutes les villes */
+        for (tab_threads[getTID()].arguments.i = 0; tab_threads[getTID()].arguments.i < nb_towns; tab_threads[getTID()].arguments.i++) { /* On regarde toutes les villes */
       
-            if (!present (i, hops, path)) { /* On rajoute les villes qui ne sont pas présentes dans le chemin path */
-                path[hops] = i;
-                int dist = distance[me][i];
+            if (!present (tab_threads[getTID()].arguments.i, tab_threads[getTID()].arguments.hops, tab_threads[getTID()].arguments.path)) { /* On rajoute les villes qui ne sont pas présentes dans le chemin tab_threads[getTID()].arguments.path */
+                tab_threads[getTID()].arguments.path[tab_threads[getTID()].arguments.hops] = tab_threads[getTID()].arguments.i;
+                tab_threads[getTID()].arguments.dist = distance[tab_threads[getTID()].arguments.me][tab_threads[getTID()].arguments.i];
 
                 /********************************************/
 
-                args->hops = hops + 1;
-                args->len = len + dist;
+                tab_threads[getTID()].arguments.hops = tab_threads[getTID()].arguments.hops + 1;
+                tab_threads[getTID()].arguments.len = tab_threads[getTID()].arguments.len + tab_threads[getTID()].arguments.dist;
 
-                memcpy(args->path, path, (hops+1) * sizeof (int));
-                memcpy(args->sol, sol, MAX_TOWNS * sizeof (int));
-                pthread_mutex_unlock (&mutex); /* On déverrouille le mutex */
-
-                return tsp ((void*)args);
+                return tsp((void*)NULL);
 
                 /********************************************/
             }
@@ -115,11 +111,21 @@ void* tsp (void* arguments)
     //printf("    EXIT TSP avec %lx\n", pthread_self());
    
     /************************************/
-    tab_threads[N_thread].occupe = 0;
-    pthread_mutex_unlock (&mutex); /* On déverrouille le mutex */
-    return (void*)NULL;;
+
+    tab_threads[getTID()].occupe = 0;
+    return ALL_IS_OK;
     
     /************************************/
+}
+
+int getTID (void){
+    int i;
+    for(i=0;i<nb_threads;i++){
+        if(pthread_equal(pthread_self(),tab_threads[i].thread)){
+        return i;
+        }
+    }
+    return -1;
 }
 
 /****************************************************************************/

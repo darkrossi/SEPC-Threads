@@ -1,7 +1,7 @@
 #ifndef _TSP_TYPES_H
 #define _TSP_TYPES_H
 
-#define MAX_TOWNS 100
+#define MAX_TOWNS 30
 
 typedef int tsp_distance_matrix_t [MAX_TOWNS] [MAX_TOWNS];
 typedef int tsp_path_t [MAX_TOWNS];

@@ -13,12 +13,9 @@ struct arg_struct {
 	int len; /* Longueur du chemin path */
 	tsp_path_t path; /* Chemin */
 
-	long long int *cuts; 
-
-	tsp_path_t sol; /* Chemin solution résultant de tsp */
-	int *sol_len; /* Longueur de la solution */
-
-	int N_thread;
+	int me;
+	int dist;
+	int i;
 };
 
 /*********************************************/
@@ -31,8 +28,11 @@ void* tsp (void* arguments);
 typedef struct Cell{
 	pthread_t thread;
 	int occupe;
+	struct arg_struct arguments;
 } Cell;
 
 /********************************************/
+
+int getTID (void);
 
 #endif

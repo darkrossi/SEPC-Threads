@@ -22,10 +22,14 @@
 #include <pthread.h>
 
 extern void* ALL_IS_OK;
-
 extern void* tsp (void* arguments);
+extern pthread_mutex_t mutex;
 
 Cell* tab_threads;
+
+tsp_path_t sol; /* Correspond à la solution */
+int sol_len; /* Longueur du chemin sol */
+long long int cuts;
 
 /*****************************/
 
@@ -100,16 +104,12 @@ int main (int argc, char **argv)
     unsigned long long perf;
 
     tsp_path_t path; /* Correspond au chemin parcouru */
-    tsp_path_t sol; /* Correspond à la solution */
 
-    int sol_len; /* Longueur du chemin sol */
-
-    long long int cuts = 0;
+    cuts = 0;
     struct tsp_queue q;
     struct timespec t1, t2;
 
     /***********************/
-    struct arg_struct arguments;
     /***********************/
 
 
@@ -159,17 +159,15 @@ int main (int argc, char **argv)
 
 
      /**********   ADD   **************/
+    int i, j = 0, k = 0;
+
 
     tab_threads = malloc(nb_threads*sizeof(Cell));
-    int i, j = 0;
-    
-    for(i = 0; i< nb_threads; i++){
-        tab_threads[i].occupe = 0;
-    }
+    memset(tab_threads, 0, nb_threads*sizeof(int));
 
      /******************************/
 
-
+    pthread_mutex_init(&mutex, NULL);
 
     while (!empty_queue (&q)) {
         j++;
@@ -183,47 +181,54 @@ int main (int argc, char **argv)
 
         /****************************************************/
 
-        arguments.hops = hops;
-        arguments.len = len;
-        memcpy(arguments.path, solution, hops * sizeof (int));
-        arguments.cuts = &cuts;
-        memcpy(arguments.sol, sol, MAX_TOWNS * sizeof (int));
-        arguments.sol_len = &sol_len;
-
         //printf("ENTREE SEARCH THREAD DISPO MAIN avec %lx\n", pthread_self());
-
+        pthread_mutex_lock (&mutex); /* On verrouille le mutex */
         for(i=0; i<nb_threads; i++){
+
             if(!tab_threads[i].occupe){
-                arguments.N_thread = i;
+
+                tab_threads[i].arguments.hops = hops;
+                tab_threads[i].arguments.len = len;
+                memcpy(tab_threads[i].arguments.path, solution, hops * sizeof (int));
+               
                 tab_threads[i].occupe = 1;
-                pthread_create (&tab_threads[i].thread, NULL, tsp, (void*)&arguments);
+
+                pthread_create (&tab_threads[i].thread, NULL, tsp, (void*)NULL);
+                k++;
                 break;
             }
         }
+        pthread_mutex_unlock (&mutex);
 
         if (i == nb_threads){
-            printf("\n Pas de thread dispo\n");
+            
             add_job (&q, solution, hops, len) ;
         }
 
        // printf("EXIT SEARCH THREAD DISPO MAIN avec %lx\n", pthread_self());
 
-        /** Parcours de la liste des threads **/
-        /*int temp_parcours = 0;
-        printf("\n    # Parcours de la liste #\n");
-        for(i=0; i<nb_threads; i++) {
-            if(tab_threads[i].occupe) temp_parcours += 1;
-        }
-        printf("    Actuellement, il y a %d threads dans la liste\n\n", temp_parcours);
-        printf("%d\n",j);*/
-        /*******************************/
+        //if (j%20 == 0){
+            /** Parcours de la liste des threads **/
+            int temp_parcours = 0;
+            printf("\n    # Parcours de la liste #\n");
+            for(i=0; i<nb_threads; i++) {
+                if(tab_threads[i].occupe) temp_parcours += 1;
+            }
+            printf("    Actuellement, il y a %d threads dans la liste\n\n", temp_parcours);
+            printf("%d\n",j);
+            /*******************************/
+        //}
 
         //printf("EXIT WHILE MAIN avec %lx\n", pthread_self());
 
     }
-
-    for(i=0; i<nb_threads; i++){
-        pthread_join(tab_threads[i].thread, NULL);
+    printf("%d et %d\n",j, k);
+    i=0;
+    while(1){
+        pthread_mutex_lock (&mutex); /* On verrouille le mutex */
+        if (!tab_threads[i].occupe) i++;
+        pthread_mutex_unlock (&mutex); /* On verrouille le mutex */
+        if (i>=nb_threads) break;
     }
     
     clock_gettime (CLOCK_REALTIME, &t2);
