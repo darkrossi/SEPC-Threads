@@ -10,7 +10,7 @@ typedef struct {
 typedef coor_t *coortab_t;
 coortab_t towns;
 
-extern int *cutprefix; /* cutprefix[i] = plus petite distance entre la ville i est une autre ville */
+extern int *cutprefix;
 
 /* initialisation du tableau des distances */
 void genmap ();

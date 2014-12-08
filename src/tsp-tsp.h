@@ -12,10 +12,6 @@ struct arg_struct {
 	int hops; /* Nb de ville dans le chemin path */
 	int len; /* Longueur du chemin path */
 	tsp_path_t path; /* Chemin */
-
-	int me;
-	int dist;
-	int i;
 };
 
 /*********************************************/
