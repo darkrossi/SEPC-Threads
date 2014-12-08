@@ -140,7 +140,6 @@ int main (int argc, char **argv)
     while (!empty_queue (&q)) {
         int hops = 0, len = 0;
         get_job (&q, solution, &hops, &len);
-				pthread_mutex_lock (&mutex); /* On verrouille le mutex */
         for(i=0; i<nb_threads; i++){
             if(!tab_threads[i].occupe){
 
@@ -158,12 +157,11 @@ int main (int argc, char **argv)
                 break;
             }
         }
-        pthread_mutex_unlock (&mutex);
-
-        if (i == nb_threads){
-            
+        if (i == nb_threads){        
             add_job (&q, solution, hops, len) ;
         }
+
+				//solution [[provisoire]] pour la gestion de l'occupation des threads
 				for(i=0; i<nb_threads; i++){
         	pthread_join(tab_threads[i].thread, NULL);
 					tab_threads[i].occupe = 0;

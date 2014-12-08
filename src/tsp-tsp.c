@@ -42,19 +42,10 @@ int getTID (void)
 
 void* tsp (void* arguments)
 {	
-		//int hops = tab_threads[getTID()].arguments.hops;
-		//int len = tab_threads[getTID()].arguments.len;
 		tsp_path_t path;
-		//memcpy(path, tab_threads[getTID()].arguments.path, MAX_TOWNS * sizeof (int));
 		int len = ((struct arg_struct*)arguments)->len;
 		int hops = ((struct arg_struct*)arguments)->hops;
 		memcpy(path,((struct arg_struct*)arguments)->path, MAX_TOWNS * sizeof (int));
-
-		/*for(int k=0;k<10;k++){
-			printf("%d",path[k]);
-		}
-		printf("#####");
-		printf("\n");*/	
 
 		pthread_mutex_lock(&mutex);
 
@@ -72,16 +63,16 @@ void* tsp (void* arguments)
 	    int me = path [hops - 1];
 	    int dist = distance[me][0]; // retourner en 0
 
-		pthread_mutex_lock(&mutex);	
+			pthread_mutex_lock(&mutex);	
 
-    if ( len + dist < minimum ) {
-		    minimum = len + dist;
-		    sol_len = len + dist;
-		    memcpy(sol, path, nb_towns*sizeof(int));
-		    print_solution (path, len+dist);
-	  }
+		  if ( len + dist < minimum ) {
+				  minimum = len + dist;
+				  sol_len = len + dist;
+				  memcpy(sol, path, nb_towns*sizeof(int));
+				  print_solution (path, len+dist);
+			}
 
-		pthread_mutex_unlock(&mutex);
+			pthread_mutex_unlock(&mutex);
     }
 
 
@@ -90,27 +81,18 @@ void* tsp (void* arguments)
  		else {
         int me = path [hops - 1];        
         for (int i = 0; i < nb_towns; i++) {
-						/*printf("I : %d, HOPS : %d, PATH : ",i,hops);
-						for(int k=0;k<10;k++){
-							printf("%d ",path[k]);
-						}
-						printf("\n");*/	
+
             if (!present (i, hops, path)) {
                 path[hops] = i;
-								//tab_threads[i].arguments.path[hops] = i;
+
                 int dist = distance[me][i];
 								struct arg_struct arg ;
-								//(tab_threads[i].arguments.hops)++;
-								//tab_threads[i].arguments.len += dist;
-					
+
 								arg.hops = hops + 1 ;
 								arg.len = len + dist;
 								memcpy(arg.path, path, MAX_TOWNS * sizeof (int));
 
                 tsp ((void*)&arg);
-
-								//(tab_threads[i].arguments.hops)--;
-								//tab_threads[i].arguments.len -= dist;
             }
         }
     }
