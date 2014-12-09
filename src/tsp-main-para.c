@@ -31,7 +31,7 @@ Cell* tab_threads;
 /* tableau des distances */
 tsp_distance_matrix_t distance ={};
 
-/** Param�tres **/
+/** Paramètres **/
 
 /* nombre de villes */
 int nb_towns=10;
@@ -56,7 +56,7 @@ static void generate_tsp_jobs (struct tsp_queue *q, int hops, int len, tsp_path_
     }
     
     if (hops == depth) {
-        /* On enregistre du travail � faire plus tard... */
+        /* On enregistre du travail à faire plus tard... */
         add_job (q, path, hops, len);
     } else {
         int me = path [hops - 1];        
@@ -127,31 +127,35 @@ int main (int argc, char **argv)
     memset (solution, -1, MAX_TOWNS * sizeof (int));
     solution[0] = 0;
 
-		tab_threads = malloc(nb_threads*sizeof(Cell));
-		memset(tab_threads, 0, nb_threads*sizeof(int));
-	  pthread_mutex_init(&mutex, NULL);
+    tab_threads = malloc(nb_threads*sizeof(Cell));
+	memset(tab_threads, 0, nb_threads*sizeof(int));
 
-		int i;
+	pthread_mutex_init(&mutex, NULL);
 
-		for(i=0; i<nb_threads; i++){
-			tab_threads[i].occupe = 0;
+	int i;
+
+	for(i=0; i<nb_threads; i++){
+		tab_threads[i].occupe = 0;
     }
 
     while (!empty_queue (&q)) {
         int hops = 0, len = 0;
         get_job (&q, solution, &hops, &len);
+        
         for(i=0; i<nb_threads; i++){
             if(!tab_threads[i].occupe){
 
-                tab_threads[i].arguments.hops = hops;
-                tab_threads[i].arguments.len = len;
-                memcpy(tab_threads[i].arguments.path, solution, hops * sizeof (int));
+                // tab_threads[i].arguments.hops = hops;
+                // tab_threads[i].arguments.len = len;
+                // memcpy(tab_threads[i].arguments.path, solution, hops * sizeof (int));
                
                 tab_threads[i].occupe = 1;
 
-								arguments.hops = hops;
-								arguments.len = len;
-								memcpy(arguments.path, solution, MAX_TOWNS * sizeof (int));
+				arguments.hops = hops;
+				arguments.len = len;
+				memcpy(arguments.path, solution, hops * sizeof (int));
+
+                arguments.pere = 1; // Un entier qui est 1 si le tsp appelé est celui du père et 0 si c'est dans les fils
 
                 pthread_create (&tab_threads[i].thread, NULL, tsp, (void*)&arguments);
                 break;
@@ -161,11 +165,16 @@ int main (int argc, char **argv)
             add_job (&q, solution, hops, len) ;
         }
 
-				//solution [[provisoire]] pour la gestion de l'occupation des threads
-				for(i=0; i<nb_threads; i++){
+		//solution [[provisoire]] pour la gestion de l'occupation des threads
+		for(i=0; i<nb_threads; i++){
         	pthread_join(tab_threads[i].thread, NULL);
-					tab_threads[i].occupe = 0;
-    		}
+			tab_threads[i].occupe = 0;
+    	}
+    }
+
+    while(1){
+        if (!tab_threads[i].occupe) i++;
+        if (i>=nb_threads) break;
     }
     
     clock_gettime (CLOCK_REALTIME, &t2);

@@ -22,11 +22,11 @@ int present (int city, int hops, tsp_path_t path)
 {
   for (int i = 0; i < hops; i++) {
 	  if (path [i] == city) {
-	    return 1;
-    }
+		return 1;
+	}
   }
-    
-    return 0 ;
+	
+	return 0 ;
 }
 
 int getTID (void)
@@ -40,62 +40,66 @@ int getTID (void)
 	return -1;
 }
 
-void* tsp (void* arguments)
-{	
-		tsp_path_t path;
-		int len = ((struct arg_struct*)arguments)->len;
-		int hops = ((struct arg_struct*)arguments)->hops;
-		memcpy(path,((struct arg_struct*)arguments)->path, MAX_TOWNS * sizeof (int));
+void* tsp (void* arguments){   
+	tsp_path_t path;
+	int len = ((struct arg_struct*)arguments)->len;
+	int hops = ((struct arg_struct*)arguments)->hops;
+	memcpy(path,((struct arg_struct*)arguments)->path, hops * sizeof (int));
 
-		pthread_mutex_lock(&mutex);
+	int pere = ((struct arg_struct*)arguments)->pere;
+	pere++; // Ligne seulement pour par erreur lors make
 
-		if (len + cutprefix[(nb_towns-hops)] >= minimum) {
-		    (cuts)++ ;
-				pthread_mutex_unlock(&mutex);
-		    return ALL_IS_OK;
-		  }
-		pthread_mutex_unlock(&mutex);    
+	pthread_mutex_lock(&mutex);
 
+	if (len + cutprefix[(nb_towns-hops)] >= minimum) {
 
+		(cuts)++ ;
 
+		//if(pere == 1) tab_threads[getTID()].occupe = 0;
 
-    if (hops == nb_towns) {
-	    int me = path [hops - 1];
-	    int dist = distance[me][0]; // retourner en 0
+		pthread_mutex_unlock(&mutex);
 
-			pthread_mutex_lock(&mutex);	
+		return ALL_IS_OK;
+	}
+	pthread_mutex_unlock(&mutex);    
 
-		  if ( len + dist < minimum ) {
-				  minimum = len + dist;
-				  sol_len = len + dist;
-				  memcpy(sol, path, nb_towns*sizeof(int));
-				  print_solution (path, len+dist);
+	if (hops == nb_towns) {
+		int me = path [hops - 1];
+		int dist = distance[me][0]; // retourner en 0
+
+		pthread_mutex_lock(&mutex); 
+
+		if ( len + dist < minimum ) {
+			minimum = len + dist;
+			sol_len = len + dist;
+			memcpy(sol, path, nb_towns*sizeof(int));
+			print_solution (path, len+dist);
+		}
+		pthread_mutex_unlock(&mutex);
+	}
+
+	else {
+		int me = path [hops - 1];        
+		for (int i = 0; i < nb_towns; i++) {
+
+			if (!present (i, hops, path)) {
+				path[hops] = i;
+
+				int dist = distance[me][i];
+				struct arg_struct arg ;
+
+				arg.hops = hops + 1 ;
+			  	arg.len = len + dist;
+				memcpy(arg.path, path, (hops+1) * sizeof (int));
+				arg.pere = 0;
+
+				tsp ((void*)&arg);
 			}
+		}
+	}
 
-			pthread_mutex_unlock(&mutex);
-    }
+	//if(pere == 1) tab_threads[getTID()].occupe = 0;
 
-
-
-
- 		else {
-        int me = path [hops - 1];        
-        for (int i = 0; i < nb_towns; i++) {
-
-            if (!present (i, hops, path)) {
-                path[hops] = i;
-
-                int dist = distance[me][i];
-								struct arg_struct arg ;
-
-								arg.hops = hops + 1 ;
-								arg.len = len + dist;
-								memcpy(arg.path, path, MAX_TOWNS * sizeof (int));
-
-                tsp ((void*)&arg);
-            }
-        }
-    }
-return ALL_IS_OK;
+	return ALL_IS_OK;
 }
 
