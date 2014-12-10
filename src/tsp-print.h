@@ -14,4 +14,6 @@ void print_solution (tsp_path_t path, int len);
 
 void print_solution_svg (tsp_path_t path, int len);
 
+void print_chemin (tsp_path_t path);
+
 #endif

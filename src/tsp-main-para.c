@@ -81,7 +81,7 @@ int main (int argc, char **argv)
     tsp_path_t path;
     struct tsp_queue q;
     struct timespec t1, t2;
-		struct arg_struct arguments;
+	
 
     /* lire les arguments */
     int opt;
@@ -142,39 +142,38 @@ int main (int argc, char **argv)
         int hops = 0, len = 0;
         get_job (&q, solution, &hops, &len);
         
-        for(i=0; i<nb_threads; i++){
+        i = 0;
+        while (1){
             if(!tab_threads[i].occupe){
-
-                // tab_threads[i].arguments.hops = hops;
-                // tab_threads[i].arguments.len = len;
-                // memcpy(tab_threads[i].arguments.path, solution, hops * sizeof (int));
-               
+                
                 tab_threads[i].occupe = 1;
+
+                struct arg_struct arguments;
 
 				arguments.hops = hops;
 				arguments.len = len;
-				memcpy(arguments.path, solution, hops * sizeof (int));
+				memcpy(arguments.path, solution, nb_towns * sizeof (int));
 
                 arguments.pere = 1; // Un entier qui est 1 si le tsp appelé est celui du père et 0 si c'est dans les fils
 
                 pthread_create (&tab_threads[i].thread, NULL, tsp, (void*)&arguments);
                 break;
             }
-        }
-        if (i == nb_threads){        
-            add_job (&q, solution, hops, len) ;
+            i = (i+1)%nb_threads;
         }
 
 		//solution [[provisoire]] pour la gestion de l'occupation des threads
-		for(i=0; i<nb_threads; i++){
-        	pthread_join(tab_threads[i].thread, NULL);
-			tab_threads[i].occupe = 0;
-    	}
+		// for(i=0; i<nb_threads; i++){
+  //       	pthread_join(tab_threads[i].thread, NULL);
+		// 	tab_threads[i].occupe = 0;
+  //   	}
     }
 
+    i = 0;
     while(1){
-        if (!tab_threads[i].occupe) i++;
-        if (i>=nb_threads) break;
+        pthread_join(tab_threads[i].thread, NULL);
+        i++;
+        if (i == nb_threads) break;
     }
     
     clock_gettime (CLOCK_REALTIME, &t2);

@@ -25,7 +25,6 @@ void* tsp (void* arguments);
 typedef struct Cell{
 	pthread_t thread;
 	int occupe;
-	struct arg_struct arguments;
 } Cell;
 
 /********************************************/

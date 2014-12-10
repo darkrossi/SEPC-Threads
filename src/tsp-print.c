@@ -37,6 +37,13 @@ void print_solution (tsp_path_t path, int len) {
   fprintf (stderr, "\n") ;
 }
 
+void print_chemin (tsp_path_t path) {
+  for (int i = 0; i < nb_towns; i++) {
+    printf ("%2d ", path[i]);
+  }
+  printf ("\n") ;
+}
+
 void print_solution_svg (tsp_path_t path, int len) {
   printf ("<!-- found path len = %3d -->\n", len);
   printf ("<svg viewBox='-10 -10 120 120'\n\
